@@ -1,0 +1,36 @@
+# Build artifacts
+bin/
+obj/
+
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# Visual Studio / Rider cache
+.vs/
+.idea/
+
+# Logs
+*.log
+
+# Dependency caches
+packages/
+
+# Generated files
+*.generated.cs
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Tooling
+TestResult*/
+*.DS_Store
+
+# Coverage
+coverage*/
+*.coverage
+*.coveragexml
