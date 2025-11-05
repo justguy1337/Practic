@@ -11,5 +11,5 @@ public record NotificationDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? SentAt,
     Guid? ProjectId,
-    Guid? VolunteerId,
+    Guid? UserId,
     Guid? DonationId);

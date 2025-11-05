@@ -8,7 +8,7 @@ public class Report
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public Guid CreatedById { get; set; }
-    public Volunteer? CreatedBy { get; set; }
+    public User? CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PublishedAt { get; set; }
     public bool IsPublic { get; set; }

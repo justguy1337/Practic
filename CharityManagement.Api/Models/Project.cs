@@ -14,7 +14,7 @@ public class Project
     public DateTimeOffset? EndDate { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Draft;
     public bool IsArchived { get; set; }
-    public ICollection<ProjectVolunteer> Volunteers { get; set; } = new List<ProjectVolunteer>();
+    public ICollection<ProjectMember> Members { get; set; } = new List<ProjectMember>();
     public ICollection<Donation> Donations { get; set; } = new List<Donation>();
     public ICollection<Report> Reports { get; set; } = new List<Report>();
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();

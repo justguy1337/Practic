@@ -7,8 +7,8 @@ public class Donation
     public Guid Id { get; set; }
     public Guid ProjectId { get; set; }
     public Project Project { get; set; } = null!;
-    public Guid? VolunteerId { get; set; }
-    public Volunteer? Volunteer { get; set; }
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
     public decimal Amount { get; set; }
     public DonationMethod Method { get; set; } = DonationMethod.Unknown;
     public string? DonorName { get; set; }

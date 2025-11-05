@@ -1,8 +1,10 @@
-using CharityManagement.Api.Data;
+﻿using CharityManagement.Api.Data;
 using CharityManagement.Api.Dtos;
 using CharityManagement.Api.Extensions;
 using CharityManagement.Api.Models;
 using CharityManagement.Api.Models.Enums;
+using CharityManagement.Api.Services.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,19 +12,22 @@ namespace CharityManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ProjectsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ICurrentUserService _currentUser;
 
-    public ProjectsController(ApplicationDbContext dbContext)
+    public ProjectsController(ApplicationDbContext dbContext, ICurrentUserService currentUser)
     {
         _dbContext = dbContext;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ProjectSummaryDto>>> GetProjects(
         [FromQuery] ProjectStatus? status,
-        [FromQuery] Guid? volunteerId,
+        [FromQuery] Guid? userId,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
         [FromQuery] string? search,
@@ -36,9 +41,9 @@ public class ProjectsController : ControllerBase
             query = query.Where(x => x.Status == status);
         }
 
-        if (volunteerId is not null && volunteerId != Guid.Empty)
+        if (userId is not null && userId != Guid.Empty)
         {
-            query = query.Where(x => x.Volunteers.Any(v => v.VolunteerId == volunteerId));
+            query = query.Where(x => x.Members.Any(m => m.UserId == userId));
         }
 
         if (from is not null)
@@ -58,6 +63,11 @@ public class ProjectsController : ControllerBase
                 x.Name.ToLower().Contains(term) ||
                 x.Code.ToLower().Contains(term) ||
                 x.Description.ToLower().Contains(term));
+        }
+
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase) && _currentUser.UserId is Guid currentUserId)
+        {
+            query = query.Where(x => x.Members.Any(m => m.UserId == currentUserId));
         }
 
         query = sortBy?.ToLowerInvariant() switch
@@ -80,24 +90,36 @@ public class ProjectsController : ControllerBase
     public async Task<ActionResult<ProjectDetailsDto>> GetProject(Guid id)
     {
         var project = await _dbContext.Projects
-            .Include(x => x.Volunteers)
-                .ThenInclude(x => x.Volunteer)
+            .Include(x => x.Members)
+                .ThenInclude(x => x.User)
             .Include(x => x.Donations)
             .Include(x => x.Reports)
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id);
 
-        return project is null
-            ? NotFound()
-            : Ok(project.ToDetailsDto());
+        if (project is null)
+        {
+            return NotFound();
+        }
+
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_currentUser.UserId is not Guid currentUserId || project.Members.All(x => x.UserId != currentUserId))
+            {
+                return Forbid();
+            }
+        }
+
+        return Ok(project.ToDetailsDto());
     }
 
     [HttpPost]
+    [Authorize(Roles = RoleNames.Administrator)]
     public async Task<ActionResult<ProjectDetailsDto>> CreateProject([FromBody] CreateProjectRequest request)
     {
         if (request.GoalAmount <= 0)
         {
-            return BadRequest("Целевая сумма должна быть больше нуля.");
+            return BadRequest("Сумма сбора должна быть положительной.");
         }
 
         var normalizedCode = request.Code.Trim().ToUpperInvariant();
@@ -130,12 +152,13 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = RoleNames.Administrator)]
     public async Task<ActionResult<ProjectDetailsDto>> UpdateProject(Guid id, [FromBody] UpdateProjectRequest request)
     {
         var project = await _dbContext.Projects
             .Include(x => x.Donations)
-            .Include(x => x.Volunteers)
-                .ThenInclude(x => x.Volunteer)
+            .Include(x => x.Members)
+                .ThenInclude(x => x.User)
             .Include(x => x.Reports)
             .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -147,7 +170,7 @@ public class ProjectsController : ControllerBase
         if (project.Status == ProjectStatus.Active &&
             (project.GoalAmount != request.GoalAmount || project.EndDate != request.EndDate))
         {
-            return BadRequest("Нельзя изменять целевую сумму или дату окончания активного проекта.");
+            return BadRequest("Нельзя изменить целевую сумму или дату окончания активного проекта.");
         }
 
         project.Name = request.Name.Trim();
@@ -167,11 +190,13 @@ public class ProjectsController : ControllerBase
         return Ok(project.ToDetailsDto());
     }
 
-    [HttpPost("{id:guid}/volunteers")]
-    public async Task<ActionResult<ProjectDetailsDto>> AssignVolunteer(Guid id, [FromBody] AssignVolunteerRequest request)
+    [HttpPost("{id:guid}/members")]
+    [Authorize(Roles = RoleNames.Administrator)]
+    public async Task<ActionResult<ProjectDetailsDto>> AssignUser(Guid id, [FromBody] AssignUserRequest request)
     {
         var project = await _dbContext.Projects
-            .Include(x => x.Volunteers)
+            .Include(x => x.Members)
+                .ThenInclude(x => x.User)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (project is null)
@@ -179,30 +204,33 @@ public class ProjectsController : ControllerBase
             return NotFound("Проект не найден.");
         }
 
-        var volunteer = await _dbContext.Volunteers.FindAsync(request.VolunteerId);
-        if (volunteer is null)
+        var user = await _dbContext.Users
+            .Include(x => x.Role)
+            .FirstOrDefaultAsync(x => x.Id == request.UserId);
+        if (user is null)
         {
-            return NotFound("Волонтер не найден.");
+            return NotFound("Пользователь не найден.");
         }
 
-        var alreadyAssigned = project.Volunteers.Any(x => x.VolunteerId == volunteer.Id);
+        var alreadyAssigned = project.Members.Any(x => x.UserId == user.Id);
         if (alreadyAssigned)
         {
-            return Conflict("Волонтер уже прикреплен к проекту.");
+            return Conflict("Пользователь уже привязан к проекту.");
         }
 
-        project.Volunteers.Add(new ProjectVolunteer
+        project.Members.Add(new ProjectMember
         {
             ProjectId = project.Id,
-            VolunteerId = volunteer.Id,
-            Role = string.IsNullOrWhiteSpace(request.Role) ? "Member" : request.Role.Trim(),
-            AssignedAt = DateTimeOffset.UtcNow
+            UserId = user.Id,
+            AssignmentRole = string.IsNullOrWhiteSpace(request.AssignmentRole) ? "Member" : request.AssignmentRole.Trim(),
+            AssignedAt = DateTimeOffset.UtcNow,
+            User = user
         });
 
         await _dbContext.SaveChangesAsync();
 
         var result = await _dbContext.Projects
-            .Include(x => x.Volunteers).ThenInclude(x => x.Volunteer)
+            .Include(x => x.Members).ThenInclude(x => x.User)
             .Include(x => x.Donations)
             .Include(x => x.Reports)
             .AsNoTracking()
@@ -211,24 +239,26 @@ public class ProjectsController : ControllerBase
         return Ok(result.ToDetailsDto());
     }
 
-    [HttpDelete("{projectId:guid}/volunteers/{volunteerId:guid}")]
-    public async Task<IActionResult> RemoveVolunteer(Guid projectId, Guid volunteerId)
+    [HttpDelete("{projectId:guid}/members/{userId:guid}")]
+    [Authorize(Roles = RoleNames.Administrator)]
+    public async Task<IActionResult> RemoveUser(Guid projectId, Guid userId)
     {
-        var link = await _dbContext.ProjectVolunteers
-            .FirstOrDefaultAsync(x => x.ProjectId == projectId && x.VolunteerId == volunteerId);
+        var link = await _dbContext.ProjectMembers
+            .FirstOrDefaultAsync(x => x.ProjectId == projectId && x.UserId == userId);
 
         if (link is null)
         {
             return NotFound();
         }
 
-        _dbContext.ProjectVolunteers.Remove(link);
+        _dbContext.ProjectMembers.Remove(link);
         await _dbContext.SaveChangesAsync();
 
         return NoContent();
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = RoleNames.Administrator)]
     public async Task<IActionResult> DeleteProject(Guid id)
     {
         var project = await _dbContext.Projects
@@ -242,7 +272,7 @@ public class ProjectsController : ControllerBase
 
         if (project.Donations.Any())
         {
-            return BadRequest("Нельзя удалить проект с пожертвованиями. Вместо этого архивируйте его.");
+            return BadRequest("Проект нельзя удалить: есть связанные пожертвования.");
         }
 
         _dbContext.Projects.Remove(project);
@@ -251,4 +281,3 @@ public class ProjectsController : ControllerBase
         return NoContent();
     }
 }
-

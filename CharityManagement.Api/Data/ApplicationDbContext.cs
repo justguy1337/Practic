@@ -1,5 +1,7 @@
 using System.Text.Json;
 using CharityManagement.Api.Models;
+using CharityManagement.Api.Models.Enums;
+using CharityManagement.Api.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -7,13 +9,17 @@ namespace CharityManagement.Api.Data;
 
 public class ApplicationDbContext : DbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+    private readonly ICurrentUserService _currentUser;
+
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ICurrentUserService? currentUser = null) : base(options)
     {
+        _currentUser = currentUser ?? NullCurrentUserService.Instance;
     }
 
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<User> Users => Set<User>();
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<Volunteer> Volunteers => Set<Volunteer>();
-    public DbSet<ProjectVolunteer> ProjectVolunteers => Set<ProjectVolunteer>();
+    public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
     public DbSet<Donation> Donations => Set<Donation>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -22,6 +28,34 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(128);
+            entity.Property(x => x.NormalizedName).HasMaxLength(128);
+            entity.HasIndex(x => x.Name).IsUnique();
+            entity.HasIndex(x => x.NormalizedName).IsUnique();
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.Property(x => x.UserName).HasMaxLength(128);
+            entity.Property(x => x.NormalizedUserName).HasMaxLength(128);
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.NormalizedEmail).HasMaxLength(256);
+            entity.Property(x => x.PasswordHash).HasMaxLength(512);
+            entity.Property(x => x.FirstName).HasMaxLength(128);
+            entity.Property(x => x.LastName).HasMaxLength(128);
+            entity.Property(x => x.PhoneNumber).HasMaxLength(32);
+            entity.Property(x => x.TwoFactorSecret).HasMaxLength(128);
+
+            entity.HasIndex(x => x.NormalizedUserName).IsUnique();
+            entity.HasIndex(x => x.NormalizedEmail).IsUnique();
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.RoleId);
+        });
 
         modelBuilder.Entity<Project>(entity =>
         {
@@ -32,27 +66,18 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.CollectedAmount).HasPrecision(18, 2);
         });
 
-        modelBuilder.Entity<Volunteer>(entity =>
+        modelBuilder.Entity<ProjectMember>(entity =>
         {
-            entity.HasIndex(x => x.Email).IsUnique();
-            entity.Property(x => x.FirstName).HasMaxLength(128);
-            entity.Property(x => x.LastName).HasMaxLength(128);
-            entity.Property(x => x.Email).HasMaxLength(256);
-            entity.Property(x => x.PhoneNumber).HasMaxLength(32);
-        });
-
-        modelBuilder.Entity<ProjectVolunteer>(entity =>
-        {
-            entity.HasKey(x => new { x.ProjectId, x.VolunteerId });
-            entity.Property(x => x.Role).HasMaxLength(64);
+            entity.HasKey(x => new { x.ProjectId, x.UserId });
+            entity.Property(x => x.AssignmentRole).HasMaxLength(64);
 
             entity.HasOne(x => x.Project)
-                .WithMany(x => x.Volunteers)
+                .WithMany(x => x.Members)
                 .HasForeignKey(x => x.ProjectId);
 
-            entity.HasOne(x => x.Volunteer)
+            entity.HasOne(x => x.User)
                 .WithMany(x => x.Projects)
-                .HasForeignKey(x => x.VolunteerId);
+                .HasForeignKey(x => x.UserId);
         });
 
         modelBuilder.Entity<Donation>(entity =>
@@ -68,9 +93,9 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(x => x.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(x => x.Volunteer)
+            entity.HasOne(x => x.User)
                 .WithMany(x => x.Donations)
-                .HasForeignKey(x => x.VolunteerId)
+                .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne(x => x.Notification)
@@ -89,7 +114,7 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(x => x.CreatedBy)
-                .WithMany()
+                .WithMany(x => x.Reports)
                 .HasForeignKey(x => x.CreatedById)
                 .OnDelete(DeleteBehavior.SetNull);
         });
@@ -103,9 +128,9 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(x => x.ProjectId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.HasOne(x => x.Volunteer)
+            entity.HasOne(x => x.User)
                 .WithMany(x => x.Notifications)
-                .HasForeignKey(x => x.VolunteerId)
+                .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }
@@ -201,6 +226,8 @@ public class ApplicationDbContext : DbContext
                 EntityId = ResolvePrimaryKey(entry),
                 Action = entry.State.ToString(),
                 Changes = JsonSerializer.Serialize(changes),
+                PerformedBy = _currentUser.UserName ?? "system",
+                UserId = _currentUser.UserId,
                 CreatedAt = DateTimeOffset.UtcNow
             });
         }

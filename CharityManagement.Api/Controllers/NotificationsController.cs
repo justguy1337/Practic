@@ -1,7 +1,10 @@
 using CharityManagement.Api.Data;
 using CharityManagement.Api.Dtos;
 using CharityManagement.Api.Extensions;
+using CharityManagement.Api.Models;
 using CharityManagement.Api.Models.Enums;
+using CharityManagement.Api.Services.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,13 +12,16 @@ namespace CharityManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class NotificationsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ICurrentUserService _currentUser;
 
-    public NotificationsController(ApplicationDbContext dbContext)
+    public NotificationsController(ApplicationDbContext dbContext, ICurrentUserService currentUser)
     {
         _dbContext = dbContext;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
@@ -24,7 +30,11 @@ public class NotificationsController : ControllerBase
         [FromQuery] NotificationChannel? channel,
         [FromQuery] Guid? projectId)
     {
-        var query = _dbContext.Notifications.AsNoTracking().AsQueryable();
+        var query = _dbContext.Notifications
+            .Include(x => x.Project)
+            .Include(x => x.User)
+            .AsNoTracking()
+            .AsQueryable();
 
         if (sent is not null)
         {
@@ -41,6 +51,13 @@ public class NotificationsController : ControllerBase
             query = query.Where(x => x.ProjectId == projectId);
         }
 
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase) && _currentUser.UserId is Guid currentUserId)
+        {
+            query = query.Where(x =>
+                x.UserId == currentUserId ||
+                (x.ProjectId != null && _dbContext.ProjectMembers.Any(pm => pm.ProjectId == x.ProjectId && pm.UserId == currentUserId)));
+        }
+
         var notifications = await query
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
@@ -49,6 +66,7 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/send")]
+    [Authorize(Roles = RoleNames.Administrator)]
     public async Task<IActionResult> MarkAsSent(Guid id)
     {
         var notification = await _dbContext.Notifications.FirstOrDefaultAsync(x => x.Id == id);
@@ -65,4 +83,3 @@ public class NotificationsController : ControllerBase
         return NoContent();
     }
 }
-

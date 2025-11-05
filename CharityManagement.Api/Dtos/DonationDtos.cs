@@ -5,7 +5,7 @@ namespace CharityManagement.Api.Dtos;
 public record DonationDto(
     Guid Id,
     Guid ProjectId,
-    Guid? VolunteerId,
+    Guid? UserId,
     decimal Amount,
     DonationMethod Method,
     string? DonorName,
@@ -16,7 +16,7 @@ public record DonationDto(
 
 public record CreateDonationRequest(
     Guid ProjectId,
-    Guid? VolunteerId,
+    Guid? UserId,
     decimal Amount,
     DonationMethod Method,
     string? DonorName,

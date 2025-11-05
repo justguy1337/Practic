@@ -1,6 +1,9 @@
-using CharityManagement.Api.Data;
+﻿using CharityManagement.Api.Data;
 using CharityManagement.Api.Dtos;
+using CharityManagement.Api.Models;
 using CharityManagement.Api.Models.Enums;
+using CharityManagement.Api.Services.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,13 +11,16 @@ namespace CharityManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class DashboardController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ICurrentUserService _currentUser;
 
-    public DashboardController(ApplicationDbContext dbContext)
+    public DashboardController(ApplicationDbContext dbContext, ICurrentUserService currentUser)
     {
         _dbContext = dbContext;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
@@ -26,13 +32,22 @@ public class DashboardController : ControllerBase
         var monthsBack = utcNow.AddMonths(-5);
         var seriesStart = new DateTimeOffset(new DateTime(monthsBack.Year, monthsBack.Month, 1, 0, 0, 0, DateTimeKind.Utc));
 
-        var totalProjects = await _dbContext.Projects.CountAsync();
-        var activeProjects = await _dbContext.Projects.CountAsync(x => x.Status == ProjectStatus.Active);
-        var completedProjects = await _dbContext.Projects.CountAsync(x => x.Status == ProjectStatus.Completed);
-        var cancelledProjects = await _dbContext.Projects.CountAsync(x => x.Status == ProjectStatus.Cancelled);
+        var projectQuery = _dbContext.Projects.AsQueryable();
+        var donationQuery = _dbContext.Donations.AsQueryable();
 
-        var totalRaised = await _dbContext.Donations.SumAsync(x => (decimal?)x.Amount) ?? 0m;
-        var monthlyRaised = await _dbContext.Donations
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase) && _currentUser.UserId is Guid currentUserId)
+        {
+            projectQuery = projectQuery.Where(p => p.Members.Any(m => m.UserId == currentUserId));
+            donationQuery = donationQuery.Where(d => d.Project.Members.Any(m => m.UserId == currentUserId));
+        }
+
+        var totalProjects = await projectQuery.CountAsync();
+        var activeProjects = await projectQuery.CountAsync(x => x.Status == ProjectStatus.Active);
+        var completedProjects = await projectQuery.CountAsync(x => x.Status == ProjectStatus.Completed);
+        var cancelledProjects = await projectQuery.CountAsync(x => x.Status == ProjectStatus.Cancelled);
+
+        var totalRaised = await donationQuery.SumAsync(x => (decimal?)x.Amount) ?? 0m;
+        var monthlyRaised = await donationQuery
             .Where(x => x.DonatedAt >= monthStart)
             .SumAsync(x => (decimal?)x.Amount) ?? 0m;
 
@@ -40,7 +55,7 @@ public class DashboardController : ControllerBase
             ? 0m
             : Math.Round((decimal)completedProjects / totalProjects * 100, 2, MidpointRounding.AwayFromZero);
 
-        var series = await _dbContext.Donations
+        var series = await donationQuery
             .Where(x => x.DonatedAt >= seriesStart)
             .GroupBy(x => new { x.DonatedAt.Year, x.DonatedAt.Month })
             .Select(g => new MonthlyDonationPoint(g.Key.Year, g.Key.Month, g.Sum(x => x.Amount)))
@@ -60,4 +75,3 @@ public class DashboardController : ControllerBase
         return Ok(result);
     }
 }
-

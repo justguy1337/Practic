@@ -13,8 +13,8 @@ public class Notification
     public DateTimeOffset? SentAt { get; set; }
     public Guid? ProjectId { get; set; }
     public Project? Project { get; set; }
-    public Guid? VolunteerId { get; set; }
-    public Volunteer? Volunteer { get; set; }
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
     public Guid? DonationId { get; set; }
     public Donation? Donation { get; set; }
 }

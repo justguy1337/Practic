@@ -7,6 +7,7 @@ public record ProjectSummaryDto(
     string Code,
     string Name,
     ProjectStatus Status,
+    string StatusColor,
     decimal GoalAmount,
     decimal CollectedAmount,
     DateTimeOffset StartDate,
@@ -19,16 +20,17 @@ public record ProjectDetailsDto(
     string Name,
     string Description,
     ProjectStatus Status,
+    string StatusColor,
     decimal GoalAmount,
     decimal CollectedAmount,
     DateTimeOffset StartDate,
     DateTimeOffset? EndDate,
     bool IsArchived,
-    IReadOnlyCollection<ProjectVolunteerDto> Volunteers,
+    IReadOnlyCollection<ProjectMemberDto> Members,
     IReadOnlyCollection<DonationDto> Donations,
     IReadOnlyCollection<ReportDto> Reports);
 
-public record ProjectVolunteerDto(Guid VolunteerId, string FullName, string Role, DateTimeOffset AssignedAt);
+public record ProjectMemberDto(Guid UserId, string FullName, string AssignmentRole, DateTimeOffset AssignedAt);
 
 public record CreateProjectRequest(
     string Code,
@@ -47,11 +49,11 @@ public record UpdateProjectRequest(
     ProjectStatus Status,
     bool IsArchived);
 
-public record AssignVolunteerRequest(Guid VolunteerId, string Role);
+public record AssignUserRequest(Guid UserId, string AssignmentRole);
 
 public record ProjectFilterRequest(
     ProjectStatus? Status,
-    Guid? VolunteerId,
+    Guid? UserId,
     DateTimeOffset? From,
     DateTimeOffset? To,
     string? Search,

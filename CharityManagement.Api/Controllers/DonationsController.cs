@@ -1,8 +1,10 @@
-using CharityManagement.Api.Data;
+﻿using CharityManagement.Api.Data;
 using CharityManagement.Api.Dtos;
 using CharityManagement.Api.Extensions;
 using CharityManagement.Api.Models;
 using CharityManagement.Api.Models.Enums;
+using CharityManagement.Api.Services.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,23 +12,34 @@ namespace CharityManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class DonationsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ICurrentUserService _currentUser;
 
-    public DonationsController(ApplicationDbContext dbContext)
+    public DonationsController(ApplicationDbContext dbContext, ICurrentUserService currentUser)
     {
         _dbContext = dbContext;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<DonationDto>>> GetDonations([FromQuery] Guid? projectId)
     {
-        IQueryable<Donation> query = _dbContext.Donations.AsNoTracking();
+        IQueryable<Donation> query = _dbContext.Donations
+            .Include(x => x.Project)
+                .ThenInclude(x => x.Members)
+            .AsNoTracking();
 
         if (projectId is not null && projectId != Guid.Empty)
         {
             query = query.Where(x => x.ProjectId == projectId);
+        }
+
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase) && _currentUser.UserId is Guid currentUserId)
+        {
+            query = query.Where(x => x.Project.Members.Any(m => m.UserId == currentUserId));
         }
 
         var donations = await query
@@ -40,12 +53,26 @@ public class DonationsController : ControllerBase
     public async Task<ActionResult<DonationDto>> GetDonation(Guid id)
     {
         var donation = await _dbContext.Donations
+            .Include(x => x.Project)
+                .ThenInclude(x => x.Members)
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id);
 
-        return donation is null
-            ? NotFound()
-            : Ok(donation.ToDto());
+        if (donation is null)
+        {
+            return NotFound();
+        }
+
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_currentUser.UserId is not Guid currentUserId ||
+                donation.Project.Members.All(m => m.UserId != currentUserId))
+            {
+                return Forbid();
+            }
+        }
+
+        return Ok(donation.ToDto());
     }
 
     [HttpPost]
@@ -53,11 +80,11 @@ public class DonationsController : ControllerBase
     {
         if (request.Amount <= 0)
         {
-            return BadRequest("Сумма пожертвования должна быть больше нуля.");
+            return BadRequest("Сумма пожертвования должна быть положительной.");
         }
 
         var project = await _dbContext.Projects
-            .Include(x => x.Notifications)
+            .Include(x => x.Members)
             .FirstOrDefaultAsync(x => x.Id == request.ProjectId);
 
         if (project is null)
@@ -65,13 +92,35 @@ public class DonationsController : ControllerBase
             return NotFound("Проект не найден.");
         }
 
-        Volunteer? volunteer = null;
-        if (request.VolunteerId is { } volunteerId && volunteerId != Guid.Empty)
+        Guid? userId = request.UserId;
+
+        if (string.Equals(_currentUser.Role, RoleNames.Volunteer, StringComparison.OrdinalIgnoreCase))
         {
-            volunteer = await _dbContext.Volunteers.FindAsync(volunteerId);
-            if (volunteer is null)
+            if (_currentUser.UserId is not Guid currentUserId)
             {
-                return NotFound("Указанный волонтер не найден.");
+                return Forbid();
+            }
+
+            userId = currentUserId;
+        }
+
+        User? user = null;
+        if (userId is Guid resolvedUserId)
+        {
+            user = await _dbContext.Users
+                .FirstOrDefaultAsync(x => x.Id == resolvedUserId);
+
+            if (user is null)
+            {
+                return NotFound("Пользователь не найден.");
+            }
+
+            var assigned = await _dbContext.ProjectMembers
+                .AnyAsync(x => x.ProjectId == project.Id && x.UserId == resolvedUserId);
+
+            if (!assigned)
+            {
+                return Forbid();
             }
         }
 
@@ -79,7 +128,7 @@ public class DonationsController : ControllerBase
         {
             Id = Guid.NewGuid(),
             ProjectId = project.Id,
-            VolunteerId = volunteer?.Id,
+            UserId = user?.Id,
             Amount = decimal.Round(request.Amount, 2, MidpointRounding.AwayFromZero),
             Method = request.Method,
             DonorName = request.DonorName?.Trim(),
@@ -90,32 +139,25 @@ public class DonationsController : ControllerBase
         };
 
         _dbContext.Donations.Add(donation);
-
         project.CollectedAmount += donation.Amount;
 
-        var notification = new Notification
+        var notifications = BuildDonationNotifications(project, user, donation).ToList();
+        if (notifications.Count > 0)
         {
-            Id = Guid.NewGuid(),
-            ProjectId = project.Id,
-            VolunteerId = volunteer?.Id,
-            DonationId = donation.Id,
-            Channel = NotificationChannel.Email,
-            Title = $"Новое пожертвование в проект {project.Name}",
-            Message = $"Получено пожертвование {donation.Amount:C} от {donation.DonorName ?? "анонимного жертвователя"}.",
-            CreatedAt = DateTimeOffset.UtcNow,
-            IsSent = false
-        };
-
-        _dbContext.Notifications.Add(notification);
+            _dbContext.Notifications.AddRange(notifications);
+        }
 
         await _dbContext.SaveChangesAsync();
 
-        var created = await _dbContext.Donations.AsNoTracking().FirstAsync(x => x.Id == donation.Id);
+        var created = await _dbContext.Donations
+            .AsNoTracking()
+            .FirstAsync(x => x.Id == donation.Id);
 
         return CreatedAtAction(nameof(GetDonation), new { id = donation.Id }, created.ToDto());
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = RoleNames.Administrator)]
     public async Task<IActionResult> DeleteDonation(Guid id)
     {
         var donation = await _dbContext.Donations.FirstOrDefaultAsync(x => x.Id == id);
@@ -131,10 +173,51 @@ public class DonationsController : ControllerBase
             project.CollectedAmount = Math.Max(0, project.CollectedAmount - donation.Amount);
         }
 
+        var relatedNotifications = await _dbContext.Notifications
+            .Where(x => x.DonationId == donation.Id)
+            .ToListAsync();
+
+        if (relatedNotifications.Count > 0)
+        {
+            _dbContext.Notifications.RemoveRange(relatedNotifications);
+        }
+
         _dbContext.Donations.Remove(donation);
         await _dbContext.SaveChangesAsync();
 
         return NoContent();
     }
-}
 
+    private static IEnumerable<Notification> BuildDonationNotifications(Project project, User? user, Donation donation)
+    {
+        var title = $"Новое пожертвование в проект {project.Name}";
+        var donorName = string.IsNullOrWhiteSpace(donation.DonorName) ? "Аноним" : donation.DonorName;
+        var message = $"Зарегистрировано пожертвование {donation.Amount:C} от {donorName}.";
+
+        yield return new Notification
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            UserId = user?.Id,
+            DonationId = donation.Id,
+            Channel = NotificationChannel.Email,
+            Title = title,
+            Message = message,
+            CreatedAt = DateTimeOffset.UtcNow,
+            IsSent = false
+        };
+
+        yield return new Notification
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            UserId = user?.Id,
+            DonationId = donation.Id,
+            Channel = NotificationChannel.Sms,
+            Title = title,
+            Message = message,
+            CreatedAt = DateTimeOffset.UtcNow,
+            IsSent = false
+        };
+    }
+}

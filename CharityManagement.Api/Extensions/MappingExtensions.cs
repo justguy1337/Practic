@@ -1,4 +1,5 @@
 using CharityManagement.Api.Dtos;
+using CharityManagement.Api.Models.Enums;
 using CharityManagement.Api.Models;
 
 namespace CharityManagement.Api.Extensions;
@@ -11,6 +12,7 @@ public static class MappingExtensions
             project.Code,
             project.Name,
             project.Status,
+            ResolveStatusColor(project.Status),
             project.GoalAmount,
             project.CollectedAmount,
             project.StartDate,
@@ -24,16 +26,17 @@ public static class MappingExtensions
             project.Name,
             project.Description,
             project.Status,
+            ResolveStatusColor(project.Status),
             project.GoalAmount,
             project.CollectedAmount,
             project.StartDate,
             project.EndDate,
             project.IsArchived,
-            project.Volunteers
-                .Select(x => new ProjectVolunteerDto(
-                    x.VolunteerId,
-                    $"{x.Volunteer.FirstName} {x.Volunteer.LastName}".Trim(),
-                    x.Role,
+            project.Members
+                .Select(x => new ProjectMemberDto(
+                    x.UserId,
+                    $"{x.User.FirstName} {x.User.LastName}".Trim(),
+                    x.AssignmentRole,
                     x.AssignedAt))
                 .ToList(),
             project.Donations
@@ -49,7 +52,7 @@ public static class MappingExtensions
         new(
             donation.Id,
             donation.ProjectId,
-            donation.VolunteerId,
+            donation.UserId,
             donation.Amount,
             donation.Method,
             donation.DonorName,
@@ -58,27 +61,31 @@ public static class MappingExtensions
             donation.PaymentReference,
             donation.DonatedAt);
 
-    public static VolunteerSummaryDto ToSummaryDto(this Volunteer volunteer) =>
+    public static UserSummaryDto ToSummaryDto(this User user) =>
         new(
-            volunteer.Id,
-            volunteer.FirstName,
-            volunteer.LastName,
-            volunteer.Email,
-            volunteer.PhoneNumber,
-            volunteer.TwoFactorEnabled,
-            volunteer.IsActive);
+            user.Id,
+            user.UserName,
+            user.FirstName,
+            user.LastName,
+            user.Email,
+            user.PhoneNumber,
+            user.Role.Name,
+            user.TwoFactorEnabled,
+            user.IsActive);
 
-    public static VolunteerDetailsDto ToDetailsDto(this Volunteer volunteer) =>
+    public static UserDetailsDto ToDetailsDto(this User user) =>
         new(
-            volunteer.Id,
-            volunteer.FirstName,
-            volunteer.LastName,
-            volunteer.Email,
-            volunteer.PhoneNumber,
-            volunteer.TwoFactorEnabled,
-            volunteer.IsActive,
-            volunteer.JoinedAt,
-            volunteer.Projects
+            user.Id,
+            user.UserName,
+            user.FirstName,
+            user.LastName,
+            user.Email,
+            user.PhoneNumber,
+            user.Role.Name,
+            user.TwoFactorEnabled,
+            user.IsActive,
+            user.JoinedAt,
+            user.Projects
                 .Select(x => x.Project.ToSummaryDto())
                 .ToList());
 
@@ -103,6 +110,16 @@ public static class MappingExtensions
             notification.CreatedAt,
             notification.SentAt,
             notification.ProjectId,
-            notification.VolunteerId,
+            notification.UserId,
             notification.DonationId);
+
+    private static string ResolveStatusColor(ProjectStatus status) =>
+        status switch
+        {
+            ProjectStatus.Active => "#22C55E",
+            ProjectStatus.Completed => "#9CA3AF",
+            ProjectStatus.Cancelled => "#EF4444",
+            ProjectStatus.Draft => "#FACC15",
+            _ => "#6B7280"
+        };
 }

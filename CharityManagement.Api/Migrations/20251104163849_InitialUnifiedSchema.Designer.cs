@@ -3,17 +3,20 @@ using System;
 using CharityManagement.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace CharityManagement.Api.Data.Migrations
+namespace CharityManagement.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251104163849_InitialUnifiedSchema")]
+    partial class InitialUnifiedSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -49,6 +52,9 @@ namespace CharityManagement.Api.Data.Migrations
                     b.Property<string>("PerformedBy")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -90,14 +96,14 @@ namespace CharityManagement.Api.Data.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("VolunteerId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("VolunteerId");
+                    b.HasIndex("UserId");
 
                     b.ToTable("Donations");
                 });
@@ -135,7 +141,7 @@ namespace CharityManagement.Api.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<Guid?>("VolunteerId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -145,7 +151,7 @@ namespace CharityManagement.Api.Data.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("VolunteerId");
+                    b.HasIndex("UserId");
 
                     b.ToTable("Notifications");
                 });
@@ -204,27 +210,27 @@ namespace CharityManagement.Api.Data.Migrations
                     b.ToTable("Projects");
                 });
 
-            modelBuilder.Entity("CharityManagement.Api.Models.ProjectVolunteer", b =>
+            modelBuilder.Entity("CharityManagement.Api.Models.ProjectMember", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("VolunteerId")
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("AssignedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Role")
+                    b.Property<string>("AssignmentRole")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.HasKey("ProjectId", "VolunteerId");
+                    b.HasKey("ProjectId", "UserId");
 
-                    b.HasIndex("VolunteerId");
+                    b.HasIndex("UserId");
 
-                    b.ToTable("ProjectVolunteers");
+                    b.ToTable("ProjectMembers");
                 });
 
             modelBuilder.Entity("CharityManagement.Api.Models.Report", b =>
@@ -266,7 +272,37 @@ namespace CharityManagement.Api.Data.Migrations
                     b.ToTable("Reports");
                 });
 
-            modelBuilder.Entity("CharityManagement.Api.Models.Volunteer", b =>
+            modelBuilder.Entity("CharityManagement.Api.Models.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("CharityManagement.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -296,22 +332,54 @@ namespace CharityManagement.Api.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("NormalizedUserName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
+                    b.HasIndex("NormalizedEmail")
                         .IsUnique();
 
-                    b.ToTable("Volunteers");
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique();
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("CharityManagement.Api.Models.Donation", b =>
@@ -322,14 +390,14 @@ namespace CharityManagement.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("CharityManagement.Api.Models.Volunteer", "Volunteer")
+                    b.HasOne("CharityManagement.Api.Models.User", "User")
                         .WithMany("Donations")
-                        .HasForeignKey("VolunteerId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Project");
 
-                    b.Navigation("Volunteer");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CharityManagement.Api.Models.Notification", b =>
@@ -344,41 +412,41 @@ namespace CharityManagement.Api.Data.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("CharityManagement.Api.Models.Volunteer", "Volunteer")
+                    b.HasOne("CharityManagement.Api.Models.User", "User")
                         .WithMany("Notifications")
-                        .HasForeignKey("VolunteerId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Donation");
 
                     b.Navigation("Project");
 
-                    b.Navigation("Volunteer");
+                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("CharityManagement.Api.Models.ProjectVolunteer", b =>
+            modelBuilder.Entity("CharityManagement.Api.Models.ProjectMember", b =>
                 {
                     b.HasOne("CharityManagement.Api.Models.Project", "Project")
-                        .WithMany("Volunteers")
+                        .WithMany("Members")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("CharityManagement.Api.Models.Volunteer", "Volunteer")
+                    b.HasOne("CharityManagement.Api.Models.User", "User")
                         .WithMany("Projects")
-                        .HasForeignKey("VolunteerId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Project");
 
-                    b.Navigation("Volunteer");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CharityManagement.Api.Models.Report", b =>
                 {
-                    b.HasOne("CharityManagement.Api.Models.Volunteer", "CreatedBy")
-                        .WithMany()
+                    b.HasOne("CharityManagement.Api.Models.User", "CreatedBy")
+                        .WithMany("Reports")
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired();
@@ -394,6 +462,17 @@ namespace CharityManagement.Api.Data.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("CharityManagement.Api.Models.User", b =>
+                {
+                    b.HasOne("CharityManagement.Api.Models.Role", "Role")
+                        .WithMany("Users")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("CharityManagement.Api.Models.Donation", b =>
                 {
                     b.Navigation("Notification");
@@ -403,20 +482,27 @@ namespace CharityManagement.Api.Data.Migrations
                 {
                     b.Navigation("Donations");
 
+                    b.Navigation("Members");
+
                     b.Navigation("Notifications");
 
                     b.Navigation("Reports");
-
-                    b.Navigation("Volunteers");
                 });
 
-            modelBuilder.Entity("CharityManagement.Api.Models.Volunteer", b =>
+            modelBuilder.Entity("CharityManagement.Api.Models.Role", b =>
+                {
+                    b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("CharityManagement.Api.Models.User", b =>
                 {
                     b.Navigation("Donations");
 
                     b.Navigation("Notifications");
 
                     b.Navigation("Projects");
+
+                    b.Navigation("Reports");
                 });
 #pragma warning restore 612, 618
         }
