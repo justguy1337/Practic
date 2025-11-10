@@ -1,0 +1,83 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CharityManagement.Client.ViewModels"
+             x:Class="CharityManagement.Client.Views.LoginView"
+             x:DataType="vm:LoginViewModel">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Column="1"
+                Grid.Row="1"
+                Width="420"
+                Padding="32"
+                CornerRadius="16"
+                Background="{DynamicResource ThemeBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                BorderThickness="1">
+            <StackPanel Spacing="20">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Авторизация"
+                               FontSize="26"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Войдите с учётной записью Charity Management."
+                               FontSize="12"
+                               Opacity="0.7"/>
+                </StackPanel>
+
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Логин или e-mail"
+                                   FontSize="12"
+                                   Opacity="0.75"/>
+                        <TextBox Text="{Binding UserNameOrEmail, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="40"
+                                 Padding="12,8"
+                                 Watermark="admin@charity.local"
+                                 CornerRadius="8"
+                                 IsEnabled="{Binding IsFormEnabled}"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Пароль"
+                                   FontSize="12"
+                                   Opacity="0.75"/>
+                        <TextBox Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="40"
+                                 Padding="12,8"
+                                 CornerRadius="8"
+                                 PasswordChar="●"
+                                 IsEnabled="{Binding IsFormEnabled}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Spacing="12">
+                    <Button Content="Войти"
+                            Command="{Binding LoginCommand}"
+                            Height="42"
+                            HorizontalAlignment="Stretch"
+                            Padding="12,10"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            CornerRadius="10"
+                            IsEnabled="{Binding IsFormEnabled}"/>
+
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="Firebrick"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

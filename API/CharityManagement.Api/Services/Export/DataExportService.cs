@@ -124,7 +124,6 @@ public class DataExportService
             {
                 r.Id,
                 r.Name,
-                r.NormalizedName,
                 r.Description
             })
             .ToListAsync(cancellationToken);

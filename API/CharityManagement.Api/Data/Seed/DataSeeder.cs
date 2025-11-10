@@ -1,4 +1,4 @@
-using CharityManagement.Api.Models;
+п»їusing CharityManagement.Api.Models;
 using CharityManagement.Api.Models.Enums;
 using CharityManagement.Api.Options;
 using Microsoft.AspNetCore.Identity;
@@ -21,35 +21,39 @@ public static class DataSeeder
 
         await EnsureRolesAsync(context);
 
-        var adminRole = await context.Roles.FirstAsync(r =>
-            r.NormalizedName == RoleNames.Administrator.ToUpperInvariant());
+        var adminRole = await context.Roles.FirstAsync(r => r.Name == RoleNames.Administrator);
 
-        var adminExists = await context.Users
-            .AnyAsync(x => x.RoleId == adminRole.Id && x.IsActive);
+        var normalizedAdminEmail = seedSettings.AdminEmail.ToUpperInvariant();
+        var admin = await context.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedAdminEmail);
 
-        if (!adminExists)
+        if (admin is null)
         {
-            var admin = new User
+            admin = new User
             {
                 Id = Guid.NewGuid(),
-                UserName = seedSettings.AdminUserName,
-                NormalizedUserName = seedSettings.AdminUserName.ToUpperInvariant(),
-                Email = seedSettings.AdminEmail.ToLowerInvariant(),
-                NormalizedEmail = seedSettings.AdminEmail.ToUpperInvariant(),
-                FirstName = "System",
-                LastName = "Administrator",
-                JoinedAt = DateTimeOffset.UtcNow,
                 CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                RoleId = adminRole.Id,
-                IsActive = true,
-                TwoFactorEnabled = false
+                JoinedAt = DateTimeOffset.UtcNow
             };
 
-            admin.PasswordHash = passwordHasher.HashPassword(admin, seedSettings.AdminPassword);
             context.Users.Add(admin);
-            await context.SaveChangesAsync();
         }
+
+        admin.UserName = seedSettings.AdminUserName;
+        admin.NormalizedUserName = seedSettings.AdminUserName.ToUpperInvariant();
+        admin.Email = seedSettings.AdminEmail.ToLowerInvariant();
+        admin.NormalizedEmail = normalizedAdminEmail;
+        admin.FirstName = "System";
+        admin.LastName = "Administrator";
+        admin.RoleId = adminRole.Id;
+        admin.IsActive = true;
+        admin.TwoFactorEnabled = false;
+        admin.TwoFactorSecret = null;
+        admin.UpdatedAt = DateTimeOffset.UtcNow;
+
+        admin.PasswordHash = passwordHasher.HashPassword(admin, seedSettings.AdminPassword);
+
+        await context.SaveChangesAsync();
 
         await SeedSampleUsersAsync(context, passwordHasher);
         await SeedSampleProjectsAsync(context);
@@ -72,14 +76,12 @@ public static class DataSeeder
             {
                 Id = Guid.NewGuid(),
                 Name = RoleNames.Administrator,
-                NormalizedName = RoleNames.Administrator.ToUpperInvariant(),
                 Description = "Administrators with full access"
             },
             new Role
             {
                 Id = Guid.NewGuid(),
                 Name = RoleNames.Volunteer,
-                NormalizedName = RoleNames.Volunteer.ToUpperInvariant(),
                 Description = "Volunteers working on projects"
             }
         };
@@ -99,15 +101,13 @@ public static class DataSeeder
         {
             Id = Guid.NewGuid(),
             Name = name,
-            NormalizedName = name.ToUpperInvariant(),
             Description = description
         });
     }
 
     private static async Task SeedSampleUsersAsync(ApplicationDbContext context, IPasswordHasher<User> passwordHasher)
     {
-        var volunteerRole = await context.Roles.FirstAsync(r =>
-            r.NormalizedName == RoleNames.Volunteer.ToUpperInvariant());
+        var volunteerRole = await context.Roles.FirstAsync(r => r.Name == RoleNames.Volunteer);
 
         var now = DateTimeOffset.UtcNow;
 
@@ -117,8 +117,8 @@ public static class DataSeeder
             {
                 UserName = "volunteer1",
                 Password = "Volunteer123!",
-                FirstName = "Анна",
-                LastName = "Петрова",
+                FirstName = "пїЅпїЅпїЅпїЅ",
+                LastName = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
                 Email = "volunteer1@charity.local",
                 Phone = "+7 (999) 100-01-01"
             },
@@ -126,8 +126,8 @@ public static class DataSeeder
             {
                 UserName = "volunteer2",
                 Password = "Volunteer123!",
-                FirstName = "Иван",
-                LastName = "Семенов",
+                FirstName = "пїЅпїЅпїЅпїЅ",
+                LastName = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
                 Email = "volunteer2@charity.local",
                 Phone = "+7 (999) 100-02-02"
             },
@@ -135,8 +135,8 @@ public static class DataSeeder
             {
                 UserName = "coordinator",
                 Password = "Volunteer123!",
-                FirstName = "Мария",
-                LastName = "Кузнецова",
+                FirstName = "пїЅпїЅпїЅпїЅпїЅ",
+                LastName = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
                 Email = "coordinator@charity.local",
                 Phone = "+7 (999) 100-03-03"
             }
@@ -191,8 +191,8 @@ public static class DataSeeder
             new
             {
                 Code = "HELP-001",
-                Name = "Оборудование для приюта",
-                Description = "Сбор средств на медицинское оборудование и корма для приюта бездомных животных.",
+                Name = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ",
+                Description = "пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.",
                 Status = ProjectStatus.Active,
                 GoalAmount = 150000m,
                 Start = now.AddMonths(-2),
@@ -201,56 +201,64 @@ public static class DataSeeder
             new
             {
                 Code = "EDU-202",
-                Name = "Образовательные наборы для школ",
-                Description = "Обеспечение сельских школ учебными материалами и ноутбуками.",
-                Status = ProjectStatus.Completed,
-                GoalAmount = 200000m,
-                Start = now.AddMonths(-6),
-                End = (DateTimeOffset?)now.AddMonths(-1)
+                Name = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
+                Description = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅа¤«.",
+                Status = ProjectStatus.Active,
+                GoalAmount = 80000m,
+                Start = now.AddMonths(-3),
+                End = (DateTimeOffset?)now.AddMonths(1)
             }
         };
 
-        var projectsByCode = new Dictionary<string, Project>(StringComparer.OrdinalIgnoreCase);
+        var projectsByCode = (await context.Projects.ToListAsync())
+            .ToDictionary(x => x.Code, x => x, StringComparer.OrdinalIgnoreCase);
 
         foreach (var spec in projectSpecs)
         {
-            var project = await context.Projects.FirstOrDefaultAsync(p => p.Code == spec.Code);
-            if (project is null)
+            if (projectsByCode.TryGetValue(spec.Code, out var project))
             {
-                project = new Project
-                {
-                    Id = Guid.NewGuid(),
-                    Code = spec.Code,
-                    Name = spec.Name,
-                    Description = spec.Description,
-                    GoalAmount = spec.GoalAmount,
-                    CollectedAmount = 0,
-                    StartDate = spec.Start,
-                    EndDate = spec.End,
-                    Status = spec.Status,
-                    IsArchived = false,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                };
-                context.Projects.Add(project);
+                project.Name = spec.Name;
+                project.Description = spec.Description;
+                project.Status = spec.Status;
+                project.GoalAmount = spec.GoalAmount;
+                project.StartDate = spec.Start;
+                project.EndDate = spec.End;
+                project.UpdatedAt = now;
+                continue;
             }
 
-            projectsByCode[spec.Code] = project!;
+            project = new Project
+            {
+                Id = Guid.NewGuid(),
+                Code = spec.Code,
+                Name = spec.Name,
+                Description = spec.Description,
+                Status = spec.Status,
+                GoalAmount = spec.GoalAmount,
+                CollectedAmount = 0,
+                StartDate = spec.Start,
+                EndDate = spec.End,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.Projects.Add(project);
+            projectsByCode[spec.Code] = project;
         }
 
         await context.SaveChangesAsync();
 
-        var users = await context.Users.ToListAsync();
-        var usersByName = users.ToDictionary(u => u.UserName, StringComparer.OrdinalIgnoreCase);
-
         var membershipSpecs = new[]
         {
-            new { ProjectCode = "HELP-001", UserName = "admin", AssignmentRole = "Куратор" },
-            new { ProjectCode = "HELP-001", UserName = "coordinator", AssignmentRole = "Координатор" },
-            new { ProjectCode = "HELP-001", UserName = "volunteer1", AssignmentRole = "Волонтер" },
-            new { ProjectCode = "EDU-202", UserName = "admin", AssignmentRole = "Куратор" },
-            new { ProjectCode = "EDU-202", UserName = "volunteer2", AssignmentRole = "Волонтер" }
+            new { ProjectCode = "HELP-001", UserName = "admin", AssignmentRole = "пїЅпїЅпїЅпїЅпїЅ" },
+            new { ProjectCode = "HELP-001", UserName = "coordinator", AssignmentRole = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ" },
+            new { ProjectCode = "HELP-001", UserName = "volunteer1", AssignmentRole = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ" },
+            new { ProjectCode = "EDU-202", UserName = "admin", AssignmentRole = "пїЅпїЅпїЅпїЅпїЅ" },
+            new { ProjectCode = "EDU-202", UserName = "volunteer2", AssignmentRole = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ" }
         };
+
+        var users = await context.Users.ToListAsync();
+        var usersByName = users.ToDictionary(u => u.UserName, StringComparer.OrdinalIgnoreCase);
 
         foreach (var spec in membershipSpecs)
         {
@@ -287,7 +295,7 @@ public static class DataSeeder
                 UserName = (string?)"volunteer1",
                 Amount = 25000m,
                 Method = DonationMethod.Online,
-                DonorName = "ООО \"Добрые руки\"",
+                DonorName = "пїЅпїЅпїЅ \"пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ\"",
                 DonorEmail = (string?)"donor@kindhands.ru",
                 DonorPhone = (string?)"+7 (900) 123-45-67",
                 PaymentReference = "PAY-HELP-001"
@@ -298,7 +306,7 @@ public static class DataSeeder
                 UserName = (string?)null,
                 Amount = 18000m,
                 Method = DonationMethod.BankTransfer,
-                DonorName = "АО \"Соседи\"",
+                DonorName = "пїЅпїЅ \"пїЅпїЅпїЅпїЅпїЅпїЅпїЅ\"",
                 DonorEmail = (string?)null,
                 DonorPhone = (string?)null,
                 PaymentReference = "PAY-HELP-002"
@@ -309,7 +317,7 @@ public static class DataSeeder
                 UserName = (string?)"volunteer2",
                 Amount = 45000m,
                 Method = DonationMethod.Cash,
-                DonorName = "ИП Соловьев",
+                DonorName = "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
                 DonorEmail = (string?)"support@solovyov.ru",
                 DonorPhone = (string?)"+7 (921) 555-44-33",
                 PaymentReference = "PAY-EDU-001"
@@ -321,14 +329,6 @@ public static class DataSeeder
         foreach (var spec in donationSpecs)
         {
             if (!projectsByCode.TryGetValue(spec.ProjectCode, out var project))
-            {
-                continue;
-            }
-
-            var existingDonation = await context.Donations
-                .FirstOrDefaultAsync(d => d.PaymentReference == spec.PaymentReference);
-
-            if (existingDonation is not null)
             {
                 continue;
             }
@@ -391,8 +391,8 @@ public static class DataSeeder
                 UserId = user?.Id,
                 DonationId = donation.Id,
                 Channel = NotificationChannel.Email,
-                Title = $"Новое пожертвование для {project.Name}",
-                Message = $"Поступило пожертвование {donation.Amount:C} от {donation.DonorName ?? "Аноним"}.",
+                Title = $"пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ {project.Name}",
+                Message = $"пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ {donation.Amount:C} пїЅпїЅ {donation.DonorName ?? "пїЅпїЅпїЅпїЅпїЅпїЅ"}.",
                 CreatedAt = now,
                 IsSent = false
             };
@@ -407,16 +407,16 @@ public static class DataSeeder
             new
             {
                 ProjectCode = "HELP-001",
-                Title = "Итоги сбора за сентябрь",
-                Content = "Собрали средства на оплату корма и закупку переносок. Спасибо всем участникам!",
+                Title = "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
+                Content = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!",
                 CreatedByUser = "coordinator",
                 IsPublic = true
             },
             new
             {
                 ProjectCode = "EDU-202",
-                Title = "Окончательный отчёт по образовательному проекту",
-                Content = "Закуплено 20 ноутбуков, отправлено 15 комплектов учебников. Проект завершён успешно.",
+                Title = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ",
+                Content = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 20 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 15 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.",
                 CreatedByUser = "admin",
                 IsPublic = true
             }

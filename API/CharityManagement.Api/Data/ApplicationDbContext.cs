@@ -32,9 +32,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Role>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(128);
-            entity.Property(x => x.NormalizedName).HasMaxLength(128);
             entity.HasIndex(x => x.Name).IsUnique();
-            entity.HasIndex(x => x.NormalizedName).IsUnique();
         });
 
         modelBuilder.Entity<User>(entity =>

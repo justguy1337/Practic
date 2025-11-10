@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:CharityManagement.Client.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="960"
+        d:DesignHeight="540"
+        x:Class="CharityManagement.Client.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{Binding ApplicationTitle}">
+
+    <Grid RowDefinitions="Auto,*"
+          RowSpacing="12"
+          Margin="20">
+        <Border CornerRadius="8"
+                Background="{DynamicResource ThemeBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                BorderThickness="1"
+                Padding="16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding ApplicationTitle}"
+                           FontSize="20"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="Подключение к API"
+                           FontSize="12"
+                           Opacity="0.7"/>
+                <TextBlock Text="{Binding ApiBaseUrl, StringFormat=Адрес: {0}}"
+                           FontSize="12"
+                           Opacity="0.7"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Padding="20"
+                CornerRadius="8"
+                Background="{DynamicResource ThemeBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                BorderThickness="1">
+            <ContentControl Content="{Binding CurrentViewModel}"/>
+        </Border>
+    </Grid>
+
+</Window>
